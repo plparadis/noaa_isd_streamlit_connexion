@@ -16,9 +16,8 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         self.year = kwargs.pop('year', 2023)  # Default value of 2023 for year
         self.base_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/"
         self.inventory_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
-        self.file_url = ""
 
-    def cursor(self) -> str:
+    def cursor(self):
         return self.file_url
 
     def _geocode_address(self):
@@ -84,7 +83,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         _self.year = year
         _self.closest_stations_df = _self._get_closest_weather_stations()
         @cache_data(ttl=ttl)
-        def _get_weather_data(_self) -> dict:
+        def _get_weather_data() -> dict:
             result = {
                 "weather_data": pd.DataFrame(),
                 "station_info": pd.DataFrame()
