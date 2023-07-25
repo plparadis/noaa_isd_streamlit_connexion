@@ -1,18 +1,24 @@
+from streamlit.connections import ExperimentalBaseConnection
+from streamlit.runtime.caching import cache_data
+
 import pandas as pd
+import numpy as np
 import geocoder
 import requests
 import os
 import gzip
+import io
 
-class WeatherDataDownloader:
-    def __init__(self, address, year):
-        self.address = address
-        self.year = year
+class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
+    """Basic st.experimental_connection implementation for NOAA ISD lite weather data"""
+    def _connect(self, **kwargs):
+        self.address = kwargs.pop('address', 'Montreal')  # Default value of "Montreal" for address
+        self.year = kwargs.pop('year', 2023)  # Default value of 2023 for year
         self.base_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/"
         self.inventory_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
-        self.closest_stations_df, self.sorted_stations_df = self._get_closest_weather_stations()
+        self.closest_stations_df = self._get_closest_weather_stations()
 
-    def geocode_address(self):
+    def _geocode_address(self):
         g = geocoder.arcgis(self.address)
         if g.ok:
             return g.lat, g.lng
@@ -21,11 +27,10 @@ class WeatherDataDownloader:
 
     def _get_closest_weather_stations(self):
         inventory_df = pd.read_csv(self.inventory_url)
-
-        address_lat, address_lng = self.geocode_address()
+        address_lat, address_lng = self._geocode_address()
         if address_lat is None or address_lng is None:
             print("Address geocoding failed.")
-            return pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame()
 
         inventory_df['LAT'] = pd.to_numeric(inventory_df['LAT'], errors='coerce')
         inventory_df['LON'] = pd.to_numeric(inventory_df['LON'], errors='coerce')
@@ -37,47 +42,33 @@ class WeatherDataDownloader:
 
         sorted_inventory_df = inventory_df.sort_values(by='DISTANCE')
 
-        return sorted_inventory_df, inventory_df
+        return sorted_inventory_df
 
-    def download_weather_data(self, station_id):
+    def _download_weather_data(self, station_id):
         filename = f"{self.year}/{station_id}-{self.year}.gz"
         file_url = os.path.join(self.base_url, filename)
         response = requests.get(file_url)
-
         if response.status_code == 200:
-            output_filename = f"{station_id}-{self.year}.gz"
-            with open(output_filename, 'wb') as f:
-                f.write(response.content)
-            print(f"Downloaded {station_id}-{self.year}.gz")
-            return output_filename
+            return io.BytesIO(response.content)
         else:
             print(f"Failed to download data for {station_id}-{self.year}.")
             print(f"Status Code: {response.status_code}")
             return None
 
-    def delete_file(self, filename):
-        try:
-            os.remove(filename)
-            print(f"Deleted {filename}")
-        except OSError as e:
-            print(f"Error deleting {filename}: {e}")
-
-    def extract_weather_data(self, filename):
+    def _extract_weather_data(self, file_content):
         columns = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'Air Temperature, Celcius', 'Dew Point Temperature, Celcius', 'Sea Level Pressure, kPa', 'Wind Direction, degrees', 'Wind Speed Rate, m/s', 'Sky Condition Total Coverage Code', 'Liquid Precipitation Depth Dimension 1hr, mm', 'Liquid Precipitation Depth Dimension 6hrs, mm']
         multipliers = [1, 1, 1, 1, 0.1, 0.1, 0.01, 1, 0.1, 1, 0.1, 0.1]  # Multipliers for respective columns
         weather_data = []
 
-        with gzip.open(filename, 'rt') as f:
+        with gzip.open(file_content, 'rt') as f:
             for line in f:
                 line_data = line.strip().split()
-                if len(line_data) != len(columns):
-                    # Fill missing values with NaN
-                    line_data.extend([float('NaN')] * (len(columns) - len(line_data)))
-                else:
-                    # Apply multipliers to appropriate columns and add units to column names
-                    for i in range(len(columns)):
-                        line_data[i] = float(line_data[i]) * multipliers[i]
-                        # line_data[i] = f"{line_data[i]} {columns[i].split(' ')[-1]}"  # Append units to the column name
+                # Replace -9999 values with NaN
+                line_data = [val if val != '-9999' else np.nan for val in line_data]
+                # Apply multipliers to appropriate columns and add units to column names
+                for i in range(len(columns)):
+                    line_data[i] = float(line_data[i]) * multipliers[i]
+                    # line_data[i] = f"{line_data[i]} {columns[i].split(' ')[-1]}"  # Append units to the column name
                 weather_data.append(line_data)
         weather_df = pd.DataFrame(weather_data, columns=columns)
         # Combine 'YEAR', 'MONTH', 'DAY', 'HOUR' columns to create the timestamp
@@ -86,59 +77,40 @@ class WeatherDataDownloader:
         weather_df.set_index('TIMESTAMP', inplace=True)
         return weather_df
 
-    def get_weather_data(self):
-        if self.closest_stations_df.empty:
-            print("No closest stations found.")
-            return None, None, None
+    def get(self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
+        self.year = year
 
-        station_id = str(self.closest_stations_df.iloc[0]['USAF']) + "-" + str(self.closest_stations_df.iloc[0]['WBAN'])
-        end_date = self.closest_stations_df.iloc[0]['END']
+        def _get_weather_data(self) -> dict:
+            result = {
+                "weather_data": pd.DataFrame(),
+                "station_info": pd.DataFrame()
+            }
 
-        # Check if the station has data for the specified year
-        if pd.to_datetime(end_date, format='%Y%m%d', errors='coerce') >= pd.to_datetime(str(self.year) + '0101', format='%Y%m%d'):
-            downloaded_file = self.download_weather_data(station_id)
+            if self.closest_stations_df.empty:
+                print("No closest stations found.")
+                return result
 
-            if downloaded_file:
-                weather_data = self.extract_weather_data(downloaded_file)
-                self.delete_file(downloaded_file)
-                return self.closest_stations_df, self.sorted_stations_df, weather_data
-        else:
-            # Try the next closest station from the list
-            for i in range(1, len(self.closest_stations_df)):
-                next_station_id = str(self.closest_stations_df.iloc[i]['USAF']) + "-" + str(self.closest_stations_df.iloc[i]['WBAN'])
-                next_end_date = self.closest_stations_df.iloc[i]['END']
+            # Filter stations that have data for the specified year
+            available_stations = self.closest_stations_df[
+                pd.to_datetime(self.closest_stations_df['END'], format='%Y%m%d', errors='coerce') >= pd.to_datetime(str(self.year) + '0101', format='%Y%m%d')
+            ]
 
-                if pd.to_datetime(next_end_date, format='%Y%m%d', errors='coerce') >= pd.to_datetime(str(self.year) + '0101', format='%Y%m%d'):
-                    downloaded_file = self.download_weather_data(next_station_id)
+            if available_stations.empty:
+                print("No data available for the specified year in nearby stations.")
+                return result
 
-                    if downloaded_file:
-                        weather_data = self.extract_weather_data(downloaded_file)
-                        self.delete_file(downloaded_file)
-                        print(f"Data not available for the closest station. Using data from the next closest station.")
-                        return self.closest_stations_df.iloc[i:i+1], self.sorted_stations_df, weather_data
+            station_id = str(available_stations.iloc[0]['USAF']) + "-" + str(available_stations.iloc[0]['WBAN'])
+            file_content = self._download_weather_data(station_id)
 
-        print("No data available for the specified year in nearby stations.")
-        return None, None, None
+            if file_content:
+                weather_data = self._extract_weather_data(file_content)
+                result["weather_data"] = weather_data
+                result["station_info"] = available_stations.iloc[0].to_frame().T
+                return result
 
-# Example usage of the class
-if __name__ == "__main__":
-    address = "05444"
-    year = 2022
+            print(f"Failed to download data for {station_id}-{self.year}.")
+            return result
 
-    weather_downloader = WeatherDataDownloader(address, year)
-    closest_stations_df, sorted_stations_df, weather_data = weather_downloader.get_weather_data()
+        return _get_weather_data(self, **kwargs)
 
-    if closest_stations_df is not None and not closest_stations_df.empty:
-        # Display the sorted DataFrame of closest weather stations
-        print("Sorted DataFrame of Closest Weather Stations:")
-        print(closest_stations_df)
 
-    if sorted_stations_df is not None and not sorted_stations_df.empty:
-        # Display the full sorted DataFrame of weather stations
-        print("\nFull Sorted DataFrame of Weather Stations:")
-        print(sorted_stations_df)
-
-    if weather_data is not None and not weather_data.empty:
-        # Display the weather data as a DataFrame
-        print("\nWeather Data:")
-        print(weather_data)
