@@ -1,3 +1,5 @@
-geopy==2.3.0
 pandas==2.0.3
 streamlit==1.25.0
+geocoder==1.38.1
+numpy==1.25.1
+requests==2.31.0
