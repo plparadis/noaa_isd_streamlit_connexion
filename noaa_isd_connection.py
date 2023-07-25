@@ -17,8 +17,8 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         self.base_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/"
         self.inventory_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
 
-    def cursor(self):
-        return self.file
+    def cursor(self) -> str:
+        return self.file_url
 
     def _geocode_address(self):
         g = geocoder.arcgis(self.address)
@@ -48,8 +48,8 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
 
     def _download_weather_data(self, station_id):
         self.filename = f"{self.year}/{station_id}-{self.year}.gz"
-        file_url = os.path.join(self.base_url, self.filename)
-        response = requests.get(file_url)
+        self.file_url = os.path.join(self.base_url, self.filename)
+        response = requests.get(self.file_url)
         if response.status_code == 200:
             return io.BytesIO(response.content)
         else:
