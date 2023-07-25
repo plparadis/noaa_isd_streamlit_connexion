@@ -63,16 +63,28 @@ class WeatherDataDownloader:
             print(f"Error deleting {filename}: {e}")
 
     def extract_weather_data(self, filename):
-        columns = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'Air Temperature', 'Dew Point Temperature', 'Sea Level Pressure', 'Wind Direction', 'Wind Speed Rate', 'Sky Condition Total Coverage Code', 'Liquid Precipitation Depth Dimension', 'Liquid Precipitation Depth Dimension']
+        columns = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'Air Temperature, Celcius', 'Dew Point Temperature, Celcius', 'Sea Level Pressure, kPa', 'Wind Direction, degrees', 'Wind Speed Rate, m/s', 'Sky Condition Total Coverage Code', 'Liquid Precipitation Depth Dimension 1hr, mm', 'Liquid Precipitation Depth Dimension 6hrs, mm']
+        multipliers = [1, 1, 1, 1, 0.1, 0.1, 0.01, 1, 0.1, 1, 0.1, 0.1]  # Multipliers for respective columns
         weather_data = []
+
         with gzip.open(filename, 'rt') as f:
             for line in f:
                 line_data = line.strip().split()
                 if len(line_data) != len(columns):
                     # Fill missing values with NaN
                     line_data.extend([float('NaN')] * (len(columns) - len(line_data)))
+                else:
+                    # Apply multipliers to appropriate columns and add units to column names
+                    for i in range(len(columns)):
+                        line_data[i] = float(line_data[i]) * multipliers[i]
+                        # line_data[i] = f"{line_data[i]} {columns[i].split(' ')[-1]}"  # Append units to the column name
                 weather_data.append(line_data)
-        return pd.DataFrame(weather_data, columns=columns)
+        weather_df = pd.DataFrame(weather_data, columns=columns)
+        # Combine 'YEAR', 'MONTH', 'DAY', 'HOUR' columns to create the timestamp
+        weather_df['TIMESTAMP'] = pd.to_datetime(weather_df[['YEAR', 'MONTH', 'DAY', 'HOUR']])
+        # Set the timestamp column as the index
+        weather_df.set_index('TIMESTAMP', inplace=True)
+        return weather_df
 
     def get_weather_data(self):
         if self.closest_stations_df.empty:
@@ -130,4 +142,3 @@ if __name__ == "__main__":
         # Display the weather data as a DataFrame
         print("\nWeather Data:")
         print(weather_data)
-
