@@ -11,7 +11,7 @@ st.title("🔌 Demo of Streamlit.connection for NOAA ISD lite weather dataset")
 
 st.subheader("Where / when do you want to get the weather")
 address = st.text_input(label="Building Address", value="Montreal", help="Support address, city, zip code, etc.")
-year = st.number_input(label="Year of historical weather data", value=datetime.date.today().year)
+year = st.number_input(label="Year of historical weather data", value=datetime.date.today().year, max_value=datetime.date.today().year)
 
 
 
@@ -33,4 +33,5 @@ st.line_chart(weather_data[['Wind Speed Rate, m/s']])
 st.subheader("Precipitations")
 st.line_chart(weather_data[['Liquid Precipitation Depth Dimension 1hr, mm']])
 
-
+st.subheader(f"Source File availlable at:")
+st.write(f"{data.cursor()}")

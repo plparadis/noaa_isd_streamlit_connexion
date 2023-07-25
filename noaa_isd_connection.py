@@ -16,6 +16,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         self.year = kwargs.pop('year', 2023)  # Default value of 2023 for year
         self.base_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/"
         self.inventory_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
+        self.file_url = ""
 
     def cursor(self) -> str:
         return self.file_url
@@ -79,23 +80,23 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         weather_df.set_index('TIMESTAMP', inplace=True)
         return weather_df
 
-    def get(self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
-        self.year = year
-        self.closest_stations_df = self._get_closest_weather_stations()
-        #@cache_data(ttl=ttl)
-        def _get_weather_data(self) -> dict:
+    def get(_self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
+        _self.year = year
+        _self.closest_stations_df = _self._get_closest_weather_stations()
+        @cache_data(ttl=ttl)
+        def _get_weather_data(_self) -> dict:
             result = {
                 "weather_data": pd.DataFrame(),
                 "station_info": pd.DataFrame()
             }
 
-            if self.closest_stations_df.empty:
+            if _self.closest_stations_df.empty:
                 print("No closest stations found.")
                 return result
 
             # Filter stations that have data for the specified year
-            available_stations = self.closest_stations_df[
-                pd.to_datetime(self.closest_stations_df['END'], format='%Y%m%d', errors='coerce') >= pd.to_datetime(str(self.year) + '0101', format='%Y%m%d')
+            available_stations = _self.closest_stations_df[
+                pd.to_datetime(_self.closest_stations_df['END'], format='%Y%m%d', errors='coerce') >= pd.to_datetime(str(_self.year) + '0101', format='%Y%m%d')
             ]
 
             if available_stations.empty:
@@ -103,17 +104,17 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
                 return result
 
             station_id = str(available_stations.iloc[0]['USAF']) + "-" + str(available_stations.iloc[0]['WBAN'])
-            file_content = self._download_weather_data(station_id)
+            file_content = _self._download_weather_data(station_id)
 
             if file_content:
-                weather_data = self._extract_weather_data(file_content)
+                weather_data = _self._extract_weather_data(file_content)
                 result["weather_data"] = weather_data
                 result["station_info"] = available_stations.iloc[0].to_frame().T
                 return result
 
-            print(f"Failed to download data for {station_id}-{self.year}.")
+            print(f"Failed to download data for {station_id}-{_self.year}.")
             return result
 
-        return _get_weather_data(self, **kwargs)
+        return _get_weather_data(_self, **kwargs)
 
 
