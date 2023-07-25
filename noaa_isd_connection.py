@@ -69,7 +69,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
                 for i in range(len(columns)):
                     line_data[i] = float(line_data[i]) * multipliers[i]
                     # line_data[i] = f"{line_data[i]} {columns[i].split(' ')[-1]}"  # Append units to the column name
-            weather_data.append(line_data)
+                weather_data.append(line_data)
         weather_df = pd.DataFrame(weather_data, columns=columns)
         # Combine 'YEAR', 'MONTH', 'DAY', 'HOUR' columns to create the timestamp
         weather_df['TIMESTAMP'] = pd.to_datetime(weather_df[['YEAR', 'MONTH', 'DAY', 'HOUR']])
