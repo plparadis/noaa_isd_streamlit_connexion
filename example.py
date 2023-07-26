@@ -18,7 +18,7 @@ year = st.number_input(label="Year of historical weather data", value=datetime.d
 
 
 data = st.experimental_connection('weather_data', type=NOAAisdWeatherDataConnection, ttl=3600, address=address, year=year)
-results = data.get(year=year)
+results = data.get(address=address, year=year)
 weather_data = results["weather_data"]
 station_info = results["station_info"]
 
@@ -36,4 +36,4 @@ st.subheader("Precipitations")
 st.line_chart(weather_data[['Liquid Precipitation Depth Dimension 1hr, mm']])
 
 st.subheader(f"Source File availlable at:")
-st.write(f"{data.cursor()}")
+st.write(f"{data.cursor(results)}")
