@@ -81,10 +81,11 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         weather_df.set_index('TIMESTAMP', inplace=True)
         return weather_df
 
-    def get(self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
+    def get(self, address: str, year: int, ttl: int = 3600, **kwargs) -> dict:
         self.year = year
+        self.address = address
         self.closest_stations_df = self._get_closest_weather_stations()
-        @cache_data(ttl=ttl)
+        #@cache_data(ttl=ttl)
         def _get_weather_data(_self) -> dict:
             result = {
                 "weather_data": pd.DataFrame(),
@@ -117,8 +118,10 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
             print(f"Failed to download data for {station_id}-{_self.year}.")
             return result
 
-        result = _get_weather_data(self, **kwargs)
-        return result
+        return _get_weather_data(self, **kwargs)
 
-    def cursor(self):
-        return self.file_url
+    def cursor(self, result) -> str:
+        station_id = str(result["station_info"].iloc[0]['USAF']) + "-" + str(result["station_info"].iloc[0]['WBAN'])
+        filename = f"{self.year}/{station_id}-{self.year}.gz"
+        file_url = os.path.join(self.base_url, filename)
+        return file_url
