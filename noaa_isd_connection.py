@@ -84,8 +84,6 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
     def get(self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
         self.year = year
         self.closest_stations_df = self._get_closest_weather_stations()
-        self.file_url = 1
-
         @cache_data(ttl=ttl)
         def _get_weather_data(_self) -> dict:
             result = {
@@ -114,14 +112,12 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
                 weather_data = _self._extract_weather_data(file_content)
                 result["weather_data"] = weather_data
                 result["station_info"] = available_stations.iloc[0].to_frame().T
-                result["file_url"] = _self.file_url
                 return result
 
             print(f"Failed to download data for {station_id}-{_self.year}.")
             return result
 
         result = _get_weather_data(self, **kwargs)
-        self.file_url = result["file_url"]
         return result
 
     def cursor(self):
