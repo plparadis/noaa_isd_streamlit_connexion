@@ -17,9 +17,6 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         self.base_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/"
         self.inventory_url = "https://www.ncei.noaa.gov/pub/data/noaa/isd-history.csv"
 
-    def cursor(self):
-        return self.file_url
-
     def _geocode_address(self):
         g = geocoder.arcgis(self.address)
         if g.ok:
@@ -47,9 +44,9 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         return sorted_inventory_df
 
     def _download_weather_data(self, station_id):
-        self.filename = f"{self.year}/{station_id}-{self.year}.gz"
-        self.file_url = os.path.join(self.base_url, self.filename)
-        response = requests.get(self.file_url)
+        filename = f"{self.year}/{station_id}-{self.year}.gz"
+        file_url = os.path.join(self.base_url, filename)
+        response = requests.get(file_url)
         if response.status_code == 200:
             return io.BytesIO(response.content)
         else:
@@ -79,11 +76,12 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         weather_df.set_index('TIMESTAMP', inplace=True)
         return weather_df
 
-    def get(_self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
-        _self.year = year
-        _self.closest_stations_df = _self._get_closest_weather_stations()
+    def get(self, year: int = 2023, ttl: int = 3600, **kwargs) -> dict:
+        self.year = year
+        self.closest_stations_df = self._get_closest_weather_stations()
+        self.file_url = 1
         @cache_data(ttl=ttl)
-        def _get_weather_data() -> dict:
+        def _get_weather_data(_self) -> dict:
             result = {
                 "weather_data": pd.DataFrame(),
                 "station_info": pd.DataFrame()
@@ -109,11 +107,14 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
                 weather_data = _self._extract_weather_data(file_content)
                 result["weather_data"] = weather_data
                 result["station_info"] = available_stations.iloc[0].to_frame().T
+                result["file_url"] = _self.file_url
                 return result
 
             print(f"Failed to download data for {station_id}-{_self.year}.")
             return result
+        result = _get_weather_data(self, **kwargs)
+        self.file_url = result["file_url"]
+        return result
 
-        return _get_weather_data(_self, **kwargs)
-
-
+    def cursor(self):
+        return self.file_url
