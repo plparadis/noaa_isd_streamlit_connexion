@@ -9,8 +9,10 @@ import os
 import gzip
 import io
 
+
 class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
     """Basic st.experimental_connection implementation for NOAA ISD lite weather data"""
+
     def _connect(self, **kwargs):
         self.address = kwargs.pop('address', 'Montreal')  # Default value of "Montreal" for address
         self.year = kwargs.pop('year', 2023)  # Default value of 2023 for year
@@ -37,7 +39,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         inventory_df.dropna(subset=['LAT', 'LON'], inplace=True)
 
         inventory_df['DISTANCE'] = ((inventory_df['LAT'] - address_lat) ** 2 + (
-                    inventory_df['LON'] - address_lng) ** 2) ** 0.5
+                inventory_df['LON'] - address_lng) ** 2) ** 0.5
 
         sorted_inventory_df = inventory_df.sort_values(by='DISTANCE')
 
@@ -55,7 +57,10 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
             return None
 
     def _extract_weather_data(self, file_content):
-        columns = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'Air Temperature, Celcius', 'Dew Point Temperature, Celcius', 'Sea Level Pressure, kPa', 'Wind Direction, degrees', 'Wind Speed Rate, m/s', 'Sky Condition Total Coverage Code', 'Liquid Precipitation Depth Dimension 1hr, mm', 'Liquid Precipitation Depth Dimension 6hrs, mm']
+        columns = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'Air Temperature, Celcius', 'Dew Point Temperature, Celcius',
+                   'Sea Level Pressure, kPa', 'Wind Direction, degrees', 'Wind Speed Rate, m/s',
+                   'Sky Condition Total Coverage Code', 'Liquid Precipitation Depth Dimension 1hr, mm',
+                   'Liquid Precipitation Depth Dimension 6hrs, mm']
         multipliers = [1, 1, 1, 1, 0.1, 0.1, 0.01, 1, 0.1, 1, 0.1, 0.1]  # Multipliers for respective columns
         weather_data = []
 
@@ -80,6 +85,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         self.year = year
         self.closest_stations_df = self._get_closest_weather_stations()
         self.file_url = 1
+
         @cache_data(ttl=ttl)
         def _get_weather_data(_self) -> dict:
             result = {
@@ -93,8 +99,9 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
 
             # Filter stations that have data for the specified year
             available_stations = _self.closest_stations_df[
-                pd.to_datetime(_self.closest_stations_df['END'], format='%Y%m%d', errors='coerce') >= pd.to_datetime(str(_self.year) + '0101', format='%Y%m%d')
-            ]
+                pd.to_datetime(_self.closest_stations_df['END'], format='%Y%m%d', errors='coerce') >= pd.to_datetime(
+                    str(_self.year) + '0101', format='%Y%m%d')
+                ]
 
             if available_stations.empty:
                 print("No data available for the specified year in nearby stations.")
@@ -112,6 +119,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
 
             print(f"Failed to download data for {station_id}-{_self.year}.")
             return result
+
         result = _get_weather_data(self, **kwargs)
         self.file_url = result["file_url"]
         return result
