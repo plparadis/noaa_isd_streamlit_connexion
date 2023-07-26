@@ -9,9 +9,9 @@ st.set_page_config(
 
 st.title("🔌 Demo of Streamlit.connection for NOAA ISD lite weather dataset")
 
-st.write("Currious to learn more about the weather, global warming or even the unprecendented flooding in Vermont or the most extreme heat wave the Southern U.S. has faced")
+st.write("Currious to learn more about the weather, global warming or even the unprecendented flooding in Vermont or the most recent extreme heat wave the Southern U.S.")
 
-st.subheader("Where / when do you want to get the weather")
+st.subheader("Where / when do you want to get to know the weather")
 address = st.text_input(label="Building Address", value="Montreal", help="Support address, city, zip code, etc.")
 year = st.number_input(label="Year of historical weather data", value=datetime.date.today().year, max_value=datetime.date.today().year)
 
