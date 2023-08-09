@@ -86,7 +86,7 @@ class NOAAisdWeatherDataConnection(ExperimentalBaseConnection):
         self.address = address
         self.closest_stations_df = self._get_closest_weather_stations()
         #@cache_data(ttl=ttl)
-        def _get_weather_data() -> dict:
+        def _get_weather_data(**kwargs) -> dict:
             result = {
                 "weather_data": pd.DataFrame(),
                 "station_info": pd.DataFrame()
