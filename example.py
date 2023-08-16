@@ -1,6 +1,7 @@
 import streamlit as st
 from noaa_isd_connection import NOAAisdWeatherDataConnection
 import datetime
+from dateutil.relativedelta import relativedelta
 import pandas as pd
 import psychrolib
 import numba as nb
@@ -44,7 +45,7 @@ with col2:
 with col1:
     start_date = st.date_input(label="Start Date",
                                value=start_date_default,
-                               min_value=None,
+                               min_value=end_date - relativedelta(years=50),
                                max_value=end_date - datetime.timedelta(days=7))
 
 st.write("You can add a psychrometric model and benchmark the numba vectorized calculation")
